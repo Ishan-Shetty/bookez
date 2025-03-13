@@ -1,0 +1,89 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       String    @id @default(cuid())
+  name     String
+  email    String    @unique
+  bookings Booking[]
+  payments Payment[]
+}
+
+model Movie {
+  id       String @id @default(cuid())
+  title    String
+  duration Int
+  shows    Show[]
+}
+
+model Theater {
+  id      String  @id @default(cuid())
+  name    String
+  location String
+  shows   Show[]
+  screens Screen[]
+}
+
+model Show {
+  id        String  @id @default(cuid())
+  movie     Movie   @relation(fields: [movieId], references: [id])
+  movieId   String
+  theater   Theater @relation(fields: [theaterId], references: [id])
+  theaterId String
+  screen    Screen  @relation(fields: [screenId], references: [id])
+  screenId  String
+  startTime DateTime
+  bookings  Booking[]
+}
+
+model Booking {
+  id         String  @id @default(cuid())
+  user       User    @relation(fields: [userId], references: [id])
+  userId     String
+  show       Show    @relation(fields: [showId], references: [id])
+  showId     String
+  seat       Seat    @relation(fields: [seatId], references: [id])
+  seatId     String
+  payment    Payment @relation(fields: [paymentId], references: [id])
+  paymentId  String
+  bookingTime DateTime @default(now())
+}
+
+model Screen {
+  id        String  @id @default(cuid())
+  theater   Theater @relation(fields: [theaterId], references: [id])
+  theaterId String
+  name      String
+  seats     Seat[]
+  shows     Show[]
+}
+
+model Seat {
+  id        String  @id @default(cuid())
+  screen    Screen  @relation(fields: [screenId], references: [id])
+  screenId  String
+  number    Int
+  isBooked  Boolean @default(false)
+  bookings  Booking[]
+}
+
+model Payment {
+  id            String  @id @default(cuid())
+  user          User    @relation(fields: [userId], references: [id])
+  userId        String
+  amount        Float
+  status        String
+  paymentMethod String
+  bookings      Booking[]
+}
+
+
