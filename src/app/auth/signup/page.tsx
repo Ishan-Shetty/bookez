@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
@@ -29,12 +30,40 @@ export default function SignUp() {
   const { toast } = useToast();
 
   const registerUser = api.user.register.useMutation({
-    onSuccess: () => {
+    onSuccess: async (user) => {
       toast({
         title: "Account created",
-        description: "Your account has been created successfully. Please sign in.",
+        description: "Your account has been created successfully. Signing you in...",
       });
-      router.push("/auth/signin");
+      
+      // Automatically sign in the user after successful registration
+      try {
+        const result = await signIn("credentials", {
+          email: user.email,
+          password: form.getValues("password"),
+          redirect: false,
+        });
+        
+        if (result?.error) {
+          toast({
+            title: "Sign in failed",
+            description: "Account created but automatic sign-in failed. Please sign in manually.",
+            variant: "destructive",
+          });
+          router.push("/auth/signin");
+        } else {
+          router.push("/");
+          router.refresh();
+        }
+      } catch (error) {
+        console.log(error);
+        toast({
+          title: "Sign in failed ",
+          description: "Account created but automatic sign-in failed. Please sign in manually.",
+          variant: "destructive",
+        });
+        router.push("/auth/signin");
+      }
     },
     onError: (error) => {
       toast({
@@ -66,7 +95,8 @@ export default function SignUp() {
         password: values.password,
       });
     } catch (error) {
-      console.log(error)
+      // Error is handled in the mutation callbacks
+      console.error("Registration error:", error);
     }
   }
 

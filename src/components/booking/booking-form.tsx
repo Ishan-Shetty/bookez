@@ -8,6 +8,7 @@ import { formatCurrency, formatDate, formatTime } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { SeatSelector } from "./seat-selector";
 import { useToast } from "~/hooks/use-toast";
+import { useSession } from "next-auth/react";
 
 type BookingFormProps = {
   show: Show & {
@@ -21,6 +22,7 @@ type BookingFormProps = {
 export function BookingForm({ show, userId }: BookingFormProps) {
   const router = useRouter();
   const { toast } = useToast();
+  const { status } = useSession();
   const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
@@ -77,6 +79,17 @@ export function BookingForm({ show, userId }: BookingFormProps) {
   });
 
   const handleBooking = () => {
+    // Check authentication status before proceeding
+    if (status !== "authenticated") {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to book tickets",
+        variant: "destructive",
+      });
+      router.push(`/auth/signin?callbackUrl=${encodeURIComponent(`/booking/${show.id}`)}`);
+      return;
+    }
+
     if (!selectedSeatId) {
       toast({
         title: "No seat selected",
@@ -88,12 +101,12 @@ export function BookingForm({ show, userId }: BookingFormProps) {
 
     setIsProcessing(true);
     
-    // Process payment first, then create booking
+    // First create a payment record
     createPayment.mutate({
       userId,
       amount: show.price,
-      status: "COMPLETED",
-      paymentMethod: "CREDIT_CARD",
+      method: "CARD",  // Default method
+      status: "COMPLETED", // Simulate completed payment
     });
   };
 

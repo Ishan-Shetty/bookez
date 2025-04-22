@@ -7,7 +7,9 @@ export default async function DashboardPage() {
   const session = await getServerAuthSession();
   
   if (!session) {
-    redirect("/auth/signin?callbackUrl=/dashboard");
+    // Encode the full URL to ensure proper redirect after sign in
+    const callbackUrl = encodeURIComponent("/dashboard");
+    redirect(`/auth/signin?callbackUrl=${callbackUrl}`);
   }
   
   // Redirect admins to admin dashboard

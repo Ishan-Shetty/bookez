@@ -14,7 +14,9 @@ export default async function BookingPage({ params }: BookingPageProps) {
   const session = await getServerAuthSession();
   
   if (!session) {
-    redirect(`/auth/signin?redirect=/booking/${showId}`);
+    // Encode both the path and showId for proper redirect
+    const callbackUrl = encodeURIComponent(`/booking/${showId}`);
+    redirect(`/auth/signin?callbackUrl=${callbackUrl}`);
   }
 
   try {
@@ -33,6 +35,7 @@ export default async function BookingPage({ params }: BookingPageProps) {
       </HydrateClient>
     );
   } catch (error) {
+    console.error("Failed to fetch show:", error);
     notFound();
   }
 }

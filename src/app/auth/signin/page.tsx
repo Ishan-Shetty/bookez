@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,9 +20,32 @@ const formSchema = z.object({
 
 export default function SignIn() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   
+  // Get the callback URL from the query string
+  const callbackUrl = searchParams?.get("callbackUrl") ?? "/";
+  const error = searchParams?.get("error");
+  
+  useEffect(() => {
+    // Show appropriate error toast based on error type
+    if (error) {
+      const errorMessages: Record<string, string> = {
+        default: "There was a problem signing you in. Please try again.",
+        CredentialsSignin: "Invalid email or password. Please try again.",
+        SessionRequired: "You need to be signed in to access this page.",
+        callback: "There was a problem with the authentication service.",
+      };
+      
+      toast({
+        title: "Authentication Error",
+        description: errorMessages[error] ?? errorMessages.default,
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -47,6 +70,7 @@ export default function SignIn() {
           description: "Invalid email or password",
           variant: "destructive",
         });
+        setIsLoading(false);
         return;
       }
 
@@ -55,8 +79,12 @@ export default function SignIn() {
         description: "You have successfully signed in",
       });
       
-      router.push("/");
-      router.refresh();
+      // Wait a brief moment to ensure the session is established
+      setTimeout(() => {
+        // Redirect to the callback URL or home
+        router.push(callbackUrl);
+        router.refresh();
+      }, 1000); // Increased timeout to ensure session is fully established
     } catch (error) {
       console.error("Sign in error:", error);
       toast({
@@ -64,7 +92,6 @@ export default function SignIn() {
         description: "Something went wrong. Please try again.",
         variant: "destructive",
       });
-    } finally {
       setIsLoading(false);
     }
   }

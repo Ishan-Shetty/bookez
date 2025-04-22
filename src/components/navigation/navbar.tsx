@@ -1,26 +1,53 @@
 "use client";
 
 import Link from "next/link";
-import { useSession } from "next-auth/react";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useSession, signOut, signIn } from "next-auth/react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import { Menu, X, Film, MapPin, Ticket, User, LayoutDashboard } from "lucide-react";
 import { Button } from "~/components/ui/button";
 
 export function Navbar() {
   const { data: session, status } = useSession();
+  console.log('====================================');
+  console.log(session);
+  console.log('====================================');
   const pathname = usePathname();
+  const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
-  const isAdmin = session?.user.role === "ADMIN";
+  const isAdmin = session?.user?.role === "ADMIN";
   const isLoggedIn = status === "authenticated";
+  const isLoading = status === "loading";
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
 
-  const isActive = (path: string) => {
-    return pathname === path || pathname?.startsWith(path + "/");
+  // Close mobile menu when route changes
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [pathname]);
+
+  const isActive = (path: string): boolean => {
+    if (!pathname) return false;
+    return pathname === path || pathname.startsWith(path + "/");
+  };
+
+  const handleSignOut = async () => {
+    try {
+      if(session){
+      await signOut({ redirect: false });
+      router.push("/");
+      router.refresh();
+      }else{
+        await signIn("google");
+
+      }
+    } catch (error) {
+      console.error("Sign out error:", error);
+      // Display error toast if needed
+    }
   };
 
   return (
@@ -50,7 +77,7 @@ export function Navbar() {
 
           {/* Desktop Auth Buttons */}
           <div className="hidden items-center space-x-4 md:flex">
-            {status === "loading" ? (
+            {isLoading ? (
               <div className="h-10 w-20 animate-pulse rounded bg-gray-100"></div>
             ) : isLoggedIn ? (
               <>
@@ -65,19 +92,30 @@ export function Navbar() {
                   <span className="text-sm font-medium">
                     {session.user.name}
                   </span>
-                  <Link href="/auth/signout">
-                    <Button variant="outline" size="sm">Sign out</Button>
-                  </Link>
+                  <Button 
+                    variant="outline" 
+                    size="lg" 
+                    onClick={handleSignOut}
+                  >
+                    {session ? "Sign out" : "Sign in"}
+                  </Button>
                 </div>
               </>
             ) : (
               <>
-                <Link href="/auth/signin">
+               <Button 
+                    variant="outline" 
+                    size="lg" 
+                    onClick={handleSignOut}
+                  >
+                    {session ? "Sign out" : "Sign in"}
+                  </Button>
+                {/* <Link href="/auth/signin">
                   <Button variant="outline">Sign in</Button>
                 </Link>
                 <Link href="/auth/signup">
                   <Button>Sign up</Button>
-                </Link>
+                </Link> */}
               </>
             )}
           </div>
@@ -131,9 +169,13 @@ export function Navbar() {
                     <User className="mr-2 h-5 w-5 text-gray-500" />
                     <span>{session.user.name}</span>
                   </div>
-                  <Link href="/auth/signout">
-                    <Button className="w-full" variant="outline">Sign out</Button>
-                  </Link>
+                  <Button 
+                    className="w-full" 
+                    variant="outline"
+                    onClick={handleSignOut}
+                  >
+                    Sign out
+                  </Button>
                 </div>
               ) : (
                 <div className="grid gap-2">
@@ -158,8 +200,10 @@ function NavLink({ href, active, children }: { href: string; active: boolean; ch
   return (
     <Link
       href={href}
-      className={`flex items-center px-1 py-2 text-sm font-medium ${
-        active ? "text-purple-700" : "text-gray-600 hover:text-purple-700"
+      className={`flex items-center text-sm font-medium ${
+        active
+          ? "text-purple-700"
+          : "text-gray-600 hover:text-gray-900"
       }`}
     >
       {children}
@@ -172,8 +216,10 @@ function MobileNavLink({ href, active, children }: { href: string; active: boole
   return (
     <Link
       href={href}
-      className={`flex items-center rounded-md px-3 py-2.5 text-sm font-medium ${
-        active ? "bg-purple-50 text-purple-700" : "text-gray-700 hover:bg-gray-50"
+      className={`flex items-center rounded-md px-3 py-2 text-sm font-medium ${
+        active
+          ? "bg-purple-50 text-purple-700"
+          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
       }`}
     >
       {children}

@@ -24,7 +24,7 @@ export default function HomePage() {
                 </Button>
               </Link>
               <Link href="/theaters">
-                <Button variant="outline" size="lg" className="min-w-[140px] border-white text-white hover:bg-white/10">
+                <Button variant="outline" size="lg" className="min-w-[140px] border-white text-purple-700 hover:bg-gray-100">
                   Find Theaters
                 </Button>
               </Link>

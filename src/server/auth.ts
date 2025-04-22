@@ -1,12 +1,12 @@
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { type GetServerSidePropsContext } from "next";
+
 import {
   getServerSession,
   type DefaultSession,
   type NextAuthOptions,
 } from "next-auth";
 import { type Adapter } from "next-auth/adapters";
-import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
 
 import { db } from "~/server/db";
 import { compare } from "bcryptjs";
@@ -31,12 +31,29 @@ declare module "next-auth" {
   }
 }
 
+// Ensure you have a strong, secure secret for production
+// For development, we also provide a fallback, but ideally use NEXTAUTH_SECRET
+const generateSecret = () => {
+  const baseSecret = process.env.NEXTAUTH_SECRET;
+  if (!baseSecret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("No NEXTAUTH_SECRET provided for production environment");
+    } else {
+      // Development fallback - still should use a real secret in .env.local
+      console.warn("Warning: No NEXTAUTH_SECRET provided. Using an insecure default for development only.");
+      return "DEVELOPMENT_SECRET_DO_NOT_USE_IN_PRODUCTION_PLEASE_SET_NEXTAUTH_SECRET";
+    }
+  }
+  return baseSecret;
+};
+
 /**
  * Options for NextAuth.js used to configure adapters, providers, callbacks, etc.
  *
  * @see https://next-auth.js.org/configuration/options
  */
 export const authOptions: NextAuthOptions = {
+  
   callbacks: {
     session: ({ session, token }) => {
       if (token) {
@@ -55,58 +72,25 @@ export const authOptions: NextAuthOptions = {
   },
   adapter: PrismaAdapter(db) as Adapter,
   providers: [
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials.password) {
-          return null;
-        }
+   GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+   }),
+      
 
-        const user = await db.user.findUnique({
-          where: { email: credentials.email },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            hashedPassword: true
-          }
-        });
-
-        if (!user?.hashedPassword) {
-          return null;
-        }
-
-        const isPasswordValid = await compare(
-          credentials.password, 
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
-          user.hashedPassword
-        );
-
-        if (!isPasswordValid) {
-          return null;
-        }
-
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          role: user.role,
-        };
-      },
-    }),
   ],
   session: {
     strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
+  secret: generateSecret(),
   pages: {
     signIn: "/auth/signin",
+    signOut: "/auth/signout",
+    error: "/auth/signin", // Error path redirects to sign-in
+    verifyRequest: "/auth/verify-request",
   },
+  debug: process.env.NODE_ENV === "development",
 };
 
 /**
@@ -114,11 +98,8 @@ export const authOptions: NextAuthOptions = {
  *
  * @see https://next-auth.js.org/configuration/nextjs
  */
-export const getServerAuthSession = (ctx: {
-  req: GetServerSidePropsContext["req"];
-  res: GetServerSidePropsContext["res"];
-}) => {
-  return getServerSession(ctx.req, ctx.res, authOptions);
+export const getServerAuthSession = async () => {
+  return await getServerSession(authOptions);
 };
 
 export const getSession = () => getServerSession(authOptions);

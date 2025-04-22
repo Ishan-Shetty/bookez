@@ -27,7 +27,7 @@ export default function RootLayout({
               <main className="flex-1">{children}</main>
               <footer className="border-t py-4">
                 <div className="container flex items-center justify-center text-sm text-muted-foreground">
-                  © {new Date().getFullYear()} BookEZ. All rights reserved.
+                  © {new Date().getFullYear()} BookEZ. All rights reserved.  Developed by Shishir Karkera & Shetty Ishan
                 </div>
               </footer>
             </div>
