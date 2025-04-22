@@ -11,50 +11,100 @@ datasource db {
 }
 
 model User {
-  id       String    @id @default(cuid())
-  name     String
-  email    String    @unique
-  bookings Booking[]
-  payments Payment[]
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  hashedPassword String?
+  role          Role      @default(USER)
+  bookings      Booking[]
+  payments      Payment[]
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum Role {
+  USER
+  ADMIN
 }
 
 model Movie {
-  id       String @id @default(cuid())
-  title    String
-  duration Int
-  shows    Show[]
+  id          String   @id @default(cuid())
+  title       String
+  duration    Int
+  description String?  @db.Text
+  posterUrl   String?
+  releaseDate DateTime?
+  shows       Show[]
 }
 
 model Theater {
-  id      String  @id @default(cuid())
-  name    String
+  id       String   @id @default(cuid())
+  name     String
   location String
-  shows   Show[]
-  screens Screen[]
+  shows    Show[]
+  screens  Screen[]
 }
 
 model Show {
-  id        String  @id @default(cuid())
-  movie     Movie   @relation(fields: [movieId], references: [id])
+  id        String    @id @default(cuid())
+  movie     Movie     @relation(fields: [movieId], references: [id])
   movieId   String
-  theater   Theater @relation(fields: [theaterId], references: [id])
+  theater   Theater   @relation(fields: [theaterId], references: [id])
   theaterId String
-  screen    Screen  @relation(fields: [screenId], references: [id])
+  screen    Screen    @relation(fields: [screenId], references: [id])
   screenId  String
   startTime DateTime
+  price     Float     @default(10.00)
   bookings  Booking[]
 }
 
 model Booking {
-  id         String  @id @default(cuid())
-  user       User    @relation(fields: [userId], references: [id])
-  userId     String
-  show       Show    @relation(fields: [showId], references: [id])
-  showId     String
-  seat       Seat    @relation(fields: [seatId], references: [id])
-  seatId     String
-  payment    Payment @relation(fields: [paymentId], references: [id])
-  paymentId  String
+  id          String   @id @default(cuid())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      String
+  show        Show     @relation(fields: [showId], references: [id])
+  showId      String
+  seat        Seat     @relation(fields: [seatId], references: [id])
+  seatId      String
+  payment     Payment  @relation(fields: [paymentId], references: [id])
+  paymentId   String
   bookingTime DateTime @default(now())
 }
 
@@ -63,27 +113,29 @@ model Screen {
   theater   Theater @relation(fields: [theaterId], references: [id])
   theaterId String
   name      String
+  rows      Int     @default(10)
+  columns   Int     @default(10)
   seats     Seat[]
   shows     Show[]
 }
 
 model Seat {
-  id        String  @id @default(cuid())
-  screen    Screen  @relation(fields: [screenId], references: [id])
-  screenId  String
-  number    Int
-  isBooked  Boolean @default(false)
-  bookings  Booking[]
+  id       String    @id @default(cuid())
+  screen   Screen    @relation(fields: [screenId], references: [id])
+  screenId String
+  row      String
+  number   Int
+  isBooked Boolean   @default(false)
+  bookings Booking[]
 }
 
 model Payment {
-  id            String  @id @default(cuid())
-  user          User    @relation(fields: [userId], references: [id])
+  id            String    @id @default(cuid())
+  user          User      @relation(fields: [userId], references: [id])
   userId        String
   amount        Float
   status        String
   paymentMethod String
+  createdAt     DateTime  @default(now())
   bookings      Booking[]
 }
-
-
