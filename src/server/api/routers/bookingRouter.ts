@@ -72,4 +72,28 @@ export const bookingRouter = createTRPCRouter({
         });
       }
     }),
+
+  getAll: publicProcedure
+    .query(async ({ ctx }) => {
+      try {
+        return await ctx.db.booking.findMany({
+          include: {
+            user: true,
+            show: {
+              include: {
+                movie: true,
+                theater: true,
+              }
+            },
+            seat: true,
+            payment: true,
+          }
+        });
+      } catch (error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Failed to fetch all bookings",
+        });
+      }
+    }),
 });

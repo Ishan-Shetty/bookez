@@ -52,7 +52,7 @@ export function ShowsList({ movieId, theaterId }: Props) {
     if (!showsByTheater[theaterId]) {
       showsByTheater[theaterId] = [];
     }
-    showsByTheater[theaterId]!.push(show);
+    showsByTheater[theaterId].push(show);
   });
 
   return (
