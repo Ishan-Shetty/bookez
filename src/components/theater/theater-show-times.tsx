@@ -83,7 +83,7 @@ export function ShowTimes({ theaterId }: ShowTimesProps) {
             <div className="hidden h-[150px] relative md:block">
               {movie.posterUrl ? (
                 <Image 
-                  src={movie.posterUrl as string}
+                  src={movie.posterUrl}
                   alt={movie.title}
                   fill
                   sizes="100px"

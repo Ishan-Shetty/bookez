@@ -2,186 +2,276 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { type Show } from "@prisma/client";
 import { api } from "~/trpc/react";
 import { formatCurrency, formatDate, formatTime } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
-import { SeatSelector } from "./seat-selector";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
+import { Separator } from "~/components/ui/separator";
 import { useToast } from "~/hooks/use-toast";
-import { useSession } from "next-auth/react";
+import { Clock, Film, MapPin } from "lucide-react";
+import Image from "next/image";
 
-type BookingFormProps = {
-  show: Show & {
-    movie: { title: string; duration: number };
-    theater: { name: string; location: string };
-    screen: { id: string; name: string; rows: number; columns: number };
-  };
+// Define proper types for the components
+interface Seat {
+  id: string;
+  row: string;
+  number: number;
+  isBooked: boolean;
+}
+
+interface Screen {
+  id: string;
+  name: string;
+}
+
+interface Theater {
+  id: string;
+  name: string;
+  location: string;
+}
+
+interface MovieSimple {
+  id: string;
+  title: string;
+  posterUrl: string | null;
+}
+
+interface Show {
+  id: string;
+  startTime: Date;
+  price: number;
+  movie: MovieSimple;
+  theater: Theater;
+  screen: Screen;
+}
+
+interface BookingFormProps {
+  show: Show;
   userId: string;
-};
+}
 
 export function BookingForm({ show, userId }: BookingFormProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { status } = useSession();
-  const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
+  const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   
-  const { data: seats, isLoading: isLoadingSeats } = api.seat.getByScreenId.useQuery({
-    screenId: show.screen.id
+  const { data: availableSeats, isLoading: isLoadingSeats } = api.seat.getAvailableSeats.useQuery({ 
+    showId: show.id 
   });
-
-  const createPayment = api.payment.create.useMutation({
-    onSuccess: (payment) => {
-      if (selectedSeatId) {
-        createBooking.mutate({
-          userId,
-          showId: show.id,
-          seatId: selectedSeatId,
-          paymentId: payment.id,
-        });
-      }
-    },
-    onError: (error) => {
-      setIsProcessing(false);
-      toast({
-        title: "Payment failed",
-        description: error.message || "There was a problem processing your payment",
-        variant: "destructive",
-      });
-    }
-  });
-
+  
   const createBooking = api.booking.create.useMutation({
-    onSuccess: (booking) => {
-      setIsProcessing(false);
-      
-      // Mark the seat as booked
-      api.seat.updateBookingStatus.mutate({
-        id: booking.seatId,
-        isBooked: true
-      });
-      
+    onSuccess: (data) => {
       toast({
         title: "Booking successful!",
-        description: "Your ticket has been booked successfully.",
+        description: "Your tickets have been booked successfully.",
       });
-      
-      router.push(`/dashboard/bookings/${booking.id}`);
+      // Redirect to booking confirmation page
+      router.push(`/dashboard/bookings/${data.id}`);
     },
     onError: (error) => {
-      setIsProcessing(false);
       toast({
         title: "Booking failed",
-        description: error.message || "There was a problem creating your booking",
+        description: error.message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
-    }
+      setIsProcessing(false);
+    },
   });
-
+  
   const handleBooking = () => {
-    // Check authentication status before proceeding
-    if (status !== "authenticated") {
+    if (!selectedSeat) {
       toast({
-        title: "Authentication required",
-        description: "Please sign in to book tickets",
-        variant: "destructive",
-      });
-      router.push(`/auth/signin?callbackUrl=${encodeURIComponent(`/booking/${show.id}`)}`);
-      return;
-    }
-
-    if (!selectedSeatId) {
-      toast({
-        title: "No seat selected",
-        description: "Please select a seat to continue.",
+        title: "Select a seat",
+        description: "Please select a seat to continue",
         variant: "destructive",
       });
       return;
     }
-
+    
     setIsProcessing(true);
     
-    // First create a payment record
-    createPayment.mutate({
+    createBooking.mutate({
+      showId: show.id,
+      seatId: selectedSeat,
       userId,
-      amount: show.price,
-      method: "CARD",  // Default method
-      status: "COMPLETED", // Simulate completed payment
+      paymentMethod: "CREDIT_CARD", // In a real app, you would let the user choose
     });
   };
+  
+  // Organize seats by row for better display
+  const seatsByRow = availableSeats?.reduce<Record<string, Seat[]>>((acc, seat) => {
+    if (!acc[seat.row]) {
+      acc[seat.row] = [];
+    }
+    acc[seat.row].push(seat);
+    return acc;
+  }, {});
+  
+  // Sort rows alphabetically or numerically
+  const sortedRows = seatsByRow ? Object.keys(seatsByRow).sort() : [];
 
   return (
-    <div className="grid gap-8 md:grid-cols-[1fr_350px]">
-      <div>
-        <div className="mb-6 rounded-lg border p-6">
-          <h2 className="mb-4 text-xl font-semibold">Movie Information</h2>
-          <div className="space-y-2">
-            <p>
-              <span className="font-semibold">Movie:</span> {show.movie.title}
-            </p>
-            <p>
-              <span className="font-semibold">Theater:</span> {show.theater.name}
-            </p>
-            <p>
-              <span className="font-semibold">Screen:</span> {show.screen.name}
-            </p>
-            <p>
-              <span className="font-semibold">Date:</span> {formatDate(show.startTime)}
-            </p>
-            <p>
-              <span className="font-semibold">Time:</span> {formatTime(show.startTime)}
-            </p>
-          </div>
-        </div>
-
-        <div className="mb-6">
-          <h2 className="mb-4 text-xl font-semibold">Select Your Seat</h2>
-          {isLoadingSeats ? (
-            <div className="animate-pulse rounded-lg bg-muted p-10 text-center">
-              Loading seats...
-            </div>
-          ) : (
-            <SeatSelector 
-              rows={show.screen.rows} 
-              columns={show.screen.columns}
-              seats={seats || []}
-              selectedSeatId={selectedSeatId}
-              onSeatSelect={setSelectedSeatId}
-            />
-          )}
-        </div>
-      </div>
-
-      <div>
-        <div className="sticky top-8 rounded-lg border p-6">
-          <h2 className="mb-4 text-xl font-semibold">Booking Summary</h2>
+    <div className="grid gap-8 md:grid-cols-3">
+      {/* Seat selection section */}
+      <div className="md:col-span-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Select Your Seat</CardTitle>
+            <CardDescription>
+              Choose a seat from the available options below
+            </CardDescription>
+          </CardHeader>
           
-          <div className="mb-6 space-y-4">
-            <div className="flex justify-between">
-              <span>Ticket Price</span>
-              <span>{formatCurrency(show.price)}</span>
-            </div>
-            <div className="border-t pt-4">
-              <div className="flex justify-between font-semibold">
-                <span>Total</span>
-                <span>{formatCurrency(show.price)}</span>
+          <CardContent>
+            {isLoadingSeats ? (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                {Array.from({ length: 24 }).map((_, i) => (
+                  <div 
+                    key={i}
+                    className="h-12 animate-pulse rounded-md bg-muted"
+                  ></div>
+                ))}
+              </div>
+            ) : !availableSeats || availableSeats.length === 0 ? (
+              <div className="rounded-lg border p-8 text-center">
+                <p className="text-muted-foreground">No seats available for this show.</p>
+                <p className="mt-2 text-sm">Please select a different show time.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="mx-auto mb-8 rounded-md bg-muted p-2 text-center text-sm">
+                  SCREEN
+                </div>
+                
+                {sortedRows.map((row) => (
+                  <div key={row} className="flex flex-wrap items-center gap-3">
+                    <div className="w-6 font-medium">
+                      {row}
+                    </div>
+                    {seatsByRow![row]!.sort((a, b) => a.number - b.number).map((seat) => (
+                      <button
+                        key={seat.id}
+                        className={`flex h-9 w-9 items-center justify-center rounded-md border text-sm transition-colors
+                          ${seat.isBooked 
+                            ? 'cursor-not-allowed bg-muted text-muted-foreground opacity-50' 
+                            : seat.id === selectedSeat
+                              ? 'border-primary bg-primary text-primary-foreground' 
+                              : 'hover:border-primary'}`}
+                        onClick={() => !seat.isBooked && setSelectedSeat(seat.id)}
+                        disabled={seat.isBooked}
+                      >
+                        {seat.number}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+                
+                <div className="mt-6 flex flex-wrap gap-6">
+                  <div className="flex items-center gap-2">
+                    <div className="h-4 w-4 rounded-full border"></div>
+                    <span className="text-sm">Available</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-4 w-4 rounded-full bg-primary"></div>
+                    <span className="text-sm">Selected</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="h-4 w-4 rounded-full bg-muted opacity-50"></div>
+                    <span className="text-sm">Booked</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Booking summary section */}
+      <div>
+        <Card className="sticky top-4">
+          <CardHeader>
+            <CardTitle>Booking Summary</CardTitle>
+          </CardHeader>
+          
+          <CardContent className="space-y-6">
+            <div className="flex gap-4">
+              <div className="aspect-[2/3] h-32 flex-shrink-0 overflow-hidden rounded-md relative">
+                <Image 
+                  src={show.movie.posterUrl ?? `https://via.placeholder.com/120x180?text=${encodeURIComponent(show.movie.title)}`}
+                  alt={show.movie.title}
+                  fill
+                  className="object-cover"
+                  sizes="120px"
+                />
+              </div>
+              
+              <div>
+                <h3 className="font-semibold">{show.movie.title}</h3>
+                <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                  <div className="flex items-center">
+                    <Clock className="mr-1.5 h-3.5 w-3.5" />
+                    <span>{formatTime(show.startTime)}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Film className="mr-1.5 h-3.5 w-3.5" />
+                    <span>{show.screen.name}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <MapPin className="mr-1.5 h-3.5 w-3.5" />
+                    <span>{show.theater.name}</span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+            
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm">Date:</span>
+                <span className="font-medium">{formatDate(show.startTime)}</span>
+              </div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm">Selected seat:</span>
+                <span className="font-medium">
+                  {selectedSeat 
+                    ? (() => {
+                        const seat = availableSeats?.find(s => s.id === selectedSeat);
+                        return seat ? `${seat.row}-${seat.number}` : "None";
+                      })()
+                    : "None"}
+                </span>
+              </div>
+            </div>
+            
+            <Separator />
+            
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Ticket price:</span>
+                <span>{formatCurrency(show.price)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Booking fee:</span>
+                <span>{formatCurrency(2.00)}</span>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between font-medium">
+                <span>Total:</span>
+                <span>{formatCurrency(show.price + 2.00)}</span>
+              </div>
+            </div>
+          </CardContent>
           
-          <Button
-            onClick={handleBooking}
-            disabled={!selectedSeatId || isProcessing}
-            className="w-full"
-            size="lg"
-          >
-            {isProcessing ? "Processing..." : "Confirm & Pay"}
-          </Button>
-          
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            By confirming, you agree to our terms and cancellation policy.
-          </p>
-        </div>
+          <CardFooter>
+            <Button 
+              className="w-full" 
+              onClick={handleBooking} 
+              disabled={!selectedSeat || isProcessing}
+            >
+              {isProcessing ? "Processing..." : "Confirm and Pay"}
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     </div>
   );

@@ -8,24 +8,19 @@ export const showRouter = createTRPCRouter({
   create: adminProcedure
     .input(
       z.object({
-        movieId: z.string(),
-        theaterId: z.string(),
-        screenId: z.string(),
-        startTime: z.date(),
-        price: z.number().optional(),
+        movieId: z.string().nonempty(),
+        theaterId: z.string().nonempty(),
+        screenId: z.string().nonempty(),
+        startTime: z.date(), // Changed from showTime to startTime
+        endTime: z.date(),
+        price: z.number().positive(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        const { movieId, theaterId, screenId, startTime, price } = input;
+        const { movieId, theaterId, screenId, startTime, endTime, price } = input;
         return await ctx.db.show.create({
-          data: { 
-            movieId, 
-            theaterId, 
-            screenId, 
-            startTime,
-            ...(price !== undefined ? { price } : {}),
-          },
+          data: { movieId, theaterId, screenId, startTime, endTime, price },
         });
       } catch (error) {
         throw new TRPCError({
@@ -36,11 +31,11 @@ export const showRouter = createTRPCRouter({
     }),
 
   getById: publicProcedure
-    .input(z.object({ id: z.string() }))
+    .input(z.object({ id: z.string().nonempty() }))
     .query(async ({ ctx, input }) => {
       try {
         const { id } = input;
-        return await ctx.db.show.findUnique({
+        const show = await ctx.db.show.findUnique({
           where: { id },
           include: {
             movie: true,
@@ -48,7 +43,20 @@ export const showRouter = createTRPCRouter({
             screen: true,
           }
         });
+
+        if (!show) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Show not found",
+          });
+        }
+
+        return show;
       } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: error instanceof Error ? error.message : "Failed to find show",
@@ -66,13 +74,35 @@ export const showRouter = createTRPCRouter({
             screen: true,
           },
           orderBy: {
-            startTime: 'asc'
+            startTime: 'desc' // Changed from showTime to startTime
           }
         });
       } catch (error) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: error instanceof Error ? error.message : "Failed to fetch shows",
+          message: error instanceof Error ? error.message : "Failed to fetch all shows",
+        });
+      }
+    }),
+    
+  getAllForAdmin: adminProcedure
+    .query(async ({ ctx }) => {
+      try {
+        return await ctx.db.show.findMany({
+          include: {
+            movie: true,
+            theater: true,
+            screen: true,
+            bookings: true,
+          },
+          orderBy: {
+            startTime: 'desc' // Changed from showTime to startTime
+          }
+        });
+      } catch (error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Failed to fetch shows for admin",
         });
       }
     }),

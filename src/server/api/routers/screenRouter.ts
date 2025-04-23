@@ -62,4 +62,34 @@ export const screenRouter = createTRPCRouter({
         });
       }
     }),
+
+  delete: publicProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const { id } = input;
+        
+        // First, check if the screen exists
+        const screen = await ctx.db.screen.findUnique({
+          where: { id },
+        });
+        
+        if (!screen) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Screen not found",
+          });
+        }
+        
+        // Delete the screen (and cascade delete all related records)
+        return await ctx.db.screen.delete({
+          where: { id },
+        });
+      } catch (error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error instanceof Error ? error.message : "Failed to delete screen",
+        });
+      }
+    }),
 });

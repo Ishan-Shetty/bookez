@@ -8,13 +8,21 @@ export const seatRouter = createTRPCRouter({
       z.object({
         screenId: z.string(),
         number: z.number(),
+        columnsPerRow: z.number().optional().default(10), // Add columnsPerRow parameter with default value
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        const { screenId, number } = input;
+        const { screenId, number, columnsPerRow } = input;
+        const rowIndex = Math.floor((number - 1) / columnsPerRow);
+        const rowLetter = String.fromCharCode(65 + rowIndex);
+        
         return await ctx.db.seat.create({
-          data: { screenId, number },
+          data: {
+            screenId,
+            number,
+            row: rowLetter,
+          },
         });
       } catch (error) {
         throw new TRPCError({

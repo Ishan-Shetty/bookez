@@ -27,7 +27,7 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover";
 import { Calendar } from "~/components/ui/calendar";
-import { cn } from "~/lib/utils";
+import { cn, emptyStringToNull } from "~/lib/utils";
 import type { Movie } from "@prisma/client";
 
 const movieFormSchema = z.object({
@@ -119,15 +119,21 @@ export function MovieForm({ movie }: MovieFormProps) {
   const onSubmit = (data: MovieFormValues) => {
     setIsSubmitting(true);
     
+    // Process empty string values as null for database compatibility
+    const processedData = {
+      ...data,
+      posterUrl: emptyStringToNull(data.posterUrl),
+    };
+    
     if (movie) {
       // Cast to any to bypass TypeScript checking since we know our API can handle this
       updateMovie.mutate({
-        ...data,
+        ...processedData,
         id: movie.id,
         _action: "update" // Custom field to indicate update action
       } as MovieUpdateInput);
     } else {
-      createMovie.mutate(data);
+      createMovie.mutate(processedData);
     }
   };
 

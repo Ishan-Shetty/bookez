@@ -3,6 +3,8 @@ import { HydrateClient } from "~/trpc/server";
 import { Button } from "~/components/ui/button";
 import { MovieCarousel } from "~/components/movie/movie-carousel";
 import { TheatersList } from "~/components/theater/theaters-showcase";
+import { FeaturedShows } from "~/components/show/featured-shows";
+import { FeaturedMovies } from "~/components/movie/featured-movies";
 
 export default function HomePage() {
   return (
@@ -38,6 +40,28 @@ export default function HomePage() {
             Popular Movies
           </h2>
           <MovieCarousel />
+        </section>
+
+        {/* Available Shows Section */}
+        <section className="mb-16">
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold">Available Shows</h2>
+            <p className="mt-2 text-muted-foreground">
+              Book your seats for upcoming shows
+            </p>
+          </div>
+          <FeaturedShows />
+        </section>
+
+        {/* Featured Movies Section */}
+        <section className="mb-16">
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold">Featured Movies</h2>
+            <p className="mt-2 text-muted-foreground">
+              Check out our selection of featured movies
+            </p>
+          </div>
+          <FeaturedMovies />
         </section>
 
         {/* Popular Theaters Section */}

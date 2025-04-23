@@ -37,8 +37,8 @@ export function ScreenList({ screens, theaterId }: ScreenListProps) {
   const { toast } = useToast();
   const [screenToDelete, setScreenToDelete] = useState<string | null>(null);
 
-  // Use an alternative approach since delete doesn't exist
-  const deleteScreenMutation = api.screen.create.useMutation({
+  // Use the proper delete mutation
+  const deleteScreenMutation = api.screen.delete.useMutation({
     onSuccess: () => {
       toast({
         title: "Screen deleted",
@@ -57,11 +57,8 @@ export function ScreenList({ screens, theaterId }: ScreenListProps) {
 
   const handleDelete = () => {
     if (screenToDelete) {
-      // Assuming the API can handle deletion through this call pattern
-      deleteScreenMutation.mutate({ 
-        id: screenToDelete,
-        _action: "delete" // Custom field to indicate delete action
-      });
+      // Use the proper delete mutation with the screen ID
+      deleteScreenMutation.mutate({ id: screenToDelete });
       setScreenToDelete(null);
     }
   };

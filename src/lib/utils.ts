@@ -27,3 +27,13 @@ export function formatTime(date: Date): string {
     hour12: true,
   }).format(date);
 }
+
+/**
+ * Converts empty strings to null
+ */
+export function emptyStringToNull(value: string | null | undefined): string | null {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  return value;
+}

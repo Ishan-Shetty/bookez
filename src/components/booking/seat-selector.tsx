@@ -1,15 +1,22 @@
 "use client";
 
-import { type Seat } from "@prisma/client";
 import { cn } from "~/lib/utils";
 
-type SeatSelectorProps = {
+export type Seat = {
+  id: string;
+  row: string;
+  number: number;
+  isBooked: boolean;
+  screenId: string;
+};
+
+interface SeatSelectorProps {
   rows: number;
   columns: number;
   seats: Seat[];
   selectedSeatId: string | null;
   onSeatSelect: (seatId: string | null) => void;
-};
+}
 
 export function SeatSelector({
   rows,
@@ -18,87 +25,109 @@ export function SeatSelector({
   selectedSeatId,
   onSeatSelect,
 }: SeatSelectorProps) {
-  // Create a map of seat positions for easier lookup
-  const seatMap: Record<string, Seat> = {};
-  
-  seats.forEach((seat) => {
-    const key = `${seat.row}:${seat.number}`;
-    seatMap[key] = seat;
-  });
-
-  const rowLabels = Array.from({ length: rows }, (_, i) => 
-    String.fromCharCode(65 + i)
-  );
-
-  const handleSeatClick = (seat: Seat | undefined) => {
-    if (!seat || seat.isBooked) return;
+  const renderSeats = () => {
+    const seatMap = [];
     
-    if (selectedSeatId === seat.id) {
-      onSeatSelect(null);
-    } else {
-      onSeatSelect(seat.id);
+    // Create a map for easier lookup
+    const seatLookup = seats.reduce<Record<string, Seat>>((acc, seat) => {
+      acc[`${seat.row}-${seat.number}`] = seat;
+      return acc;
+    }, {});
+    
+    // Generate row labels (A, B, C, etc.)
+    const rowLabels = Array.from({ length: rows }, (_, i) => 
+      String.fromCharCode(65 + i)
+    );
+    
+    for (let r = 0; r < rows; r++) {
+      const row = [];
+      const rowLabel = rowLabels[r];
+      
+      // Add row label at the beginning
+      row.push(
+        <div 
+          key={`row-label-${r}`} 
+          className="flex h-8 w-8 items-center justify-center font-medium text-muted-foreground"
+        >
+          {rowLabel}
+        </div>
+      );
+      
+      for (let c = 1; c <= columns; c++) {
+        const seatKey = `${rowLabel}-${c}`;
+        const seat = seatLookup[seatKey];
+        
+        if (!seat) {
+          // If seat doesn't exist in the database, render an empty space
+          row.push(
+            <div 
+              key={`empty-${r}-${c}`} 
+              className="m-1 h-8 w-8"
+            />
+          );
+          continue;
+        }
+        
+        const isSelected = selectedSeatId === seat.id;
+        const isBooked = seat.isBooked;
+        
+        row.push(
+          <button 
+            key={seat.id}
+            disabled={isBooked}
+            onClick={() => onSeatSelect(isSelected ? null : seat.id)}
+            className={cn(
+              "m-1 flex h-8 w-8 items-center justify-center rounded text-sm transition-colors",
+              isBooked 
+                ? "cursor-not-allowed bg-gray-300 text-gray-500" 
+                : isSelected 
+                  ? "bg-primary text-primary-foreground" 
+                  : "bg-white hover:bg-primary/20 border border-gray-300"
+            )}
+            aria-label={`Seat ${rowLabel}${c}`}
+            title={isBooked ? "This seat is already booked" : `Seat ${rowLabel}${c}`}
+          >
+            {c}
+          </button>
+        );
+      }
+      
+      seatMap.push(
+        <div key={`row-${r}`} className="mb-2 flex">
+          {row}
+        </div>
+      );
     }
+    
+    return seatMap;
   };
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <div className="mb-8 w-full rounded-lg bg-gray-200 p-2 text-center text-sm font-medium text-gray-800">
-        SCREEN
-      </div>
-      
-      <div className="flex flex-col items-center space-y-2">
-        {rowLabels.map((rowLabel) => (
-          <div key={rowLabel} className="flex items-center">
-            <div className="mr-3 w-6 text-right font-medium">{rowLabel}</div>
-            
-            <div className="flex space-x-2">
-              {Array.from({ length: columns }, (_, i) => {
-                const seatNum = i + 1;
-                const seatKey = `${rowLabel}:${seatNum}`;
-                const seat = seatMap[seatKey];
-                
-                return (
-                  <button
-                    key={`${rowLabel}-${seatNum}`}
-                    type="button"
-                    disabled={seat?.isBooked}
-                    className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded",
-                      "transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
-                      {
-                        "bg-primary text-primary-foreground hover:bg-primary/90": 
-                          seat?.id === selectedSeatId,
-                        "bg-muted text-muted-foreground hover:bg-muted/80": 
-                          seat && !seat.isBooked && seat.id !== selectedSeatId,
-                        "cursor-not-allowed bg-gray-300 text-gray-500": 
-                          !seat || seat.isBooked,
-                      }
-                    )}
-                    onClick={() => handleSeatClick(seat)}
-                  >
-                    {seatNum}
-                  </button>
-                );
-              })}
-            </div>
-            
-            <div className="ml-3 w-6 font-medium">{rowLabel}</div>
+    <div>
+      <div className="mb-8 rounded-lg border p-4">
+        <div className="mb-6 flex flex-col items-center">
+          <div className="mb-8 w-full max-w-md rounded-lg bg-gray-200 p-2 text-center text-sm font-medium">
+            Screen
           </div>
-        ))}
-      </div>
-      
-      <div className="mt-8 flex justify-center space-x-6 text-sm">
-        <div className="flex items-center">
-          <div className="mr-2 h-4 w-4 rounded bg-muted"></div>
-          <span>Available</span>
+          
+          <div className="mb-4 flex flex-wrap justify-center">
+            {renderSeats()}
+          </div>
         </div>
-        <div className="flex items-center">
-          <div className="mr-2 h-4 w-4 rounded bg-gray-300"></div>
-          <span>Booked</span>
-        </div>
-        <div className="flex items-center">
-          <div className="mr-2 h-4 w-4 rounded bg-primary"></div>
-          <span>Selected</span>
+        
+        <div className="flex justify-center gap-6 text-sm">
+          <div className="flex items-center">
+            <div className="mr-2 h-4 w-4 rounded border border-gray-300 bg-white"></div>
+            <span>Available</span>
+          </div>
+          <div className="flex items-center">
+            <div className="mr-2 h-4 w-4 rounded bg-gray-300"></div>
+            <span>Booked</span>
+          </div>
+          <div className="flex items-center">
+            <div className="mr-2 h-4 w-4 rounded bg-primary"></div>
+            <span>Selected</span>
+          </div>
         </div>
       </div>
     </div>

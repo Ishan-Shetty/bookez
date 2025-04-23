@@ -88,7 +88,7 @@ model Show {
   movieId   String
   theater   Theater   @relation(fields: [theaterId], references: [id])
   theaterId String
-  screen    Screen    @relation(fields: [screenId], references: [id])
+  screen    Screen    @relation(fields: [screenId], references: [id], onDelete: Cascade)
   screenId  String
   startTime DateTime
   price     Float     @default(10.00)
@@ -121,12 +121,19 @@ model Screen {
 
 model Seat {
   id       String    @id @default(cuid())
-  screen   Screen    @relation(fields: [screenId], references: [id])
+  screen   Screen    @relation(fields: [screenId], references: [id], onDelete: Cascade)
   screenId String
   row      String
   number   Int
   isBooked Boolean   @default(false)
+  status   SeatStatus @default(AVAILABLE)
   bookings Booking[]
+}
+
+enum SeatStatus {
+  AVAILABLE
+  RESERVED
+  BOOKED
 }
 
 model Payment {
