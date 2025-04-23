@@ -6,9 +6,9 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('en-IN', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'INR',
   }).format(amount);
 }
 
@@ -36,4 +36,18 @@ export function emptyStringToNull(value: string | null | undefined): string | nu
     return null;
   }
   return value;
+}
+
+/**
+ * Format movie duration from minutes to hours and minutes
+ */
+export function formatDuration(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  
+  if (hours === 0) {
+    return `${mins}m`;
+  }
+  
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 }

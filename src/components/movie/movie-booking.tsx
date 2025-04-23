@@ -75,10 +75,10 @@ export function MovieBooking({ movieId }: MovieBookingProps) {
                 key={date.toISOString()} 
                 value={format(date, "yyyy-MM-dd")}
                 onClick={() => setSelectedDate(date)}
-                className="flex flex-col py-2 text-center"
+                className="flex flex-col py-3 text-center"
               >
-                <span className="text-xs font-medium">{format(date, "EEE")}</span>
-                <span className="text-sm">{format(date, "MMM d")}</span>
+                <span className="text-sm font-medium">{format(date, "EEE")}</span>
+                <span className="text-base">{format(date, "MMM d")}</span>
               </TabsTrigger>
             ))}
           </TabsList>

@@ -1,55 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
-import { format } from "date-fns";
-import { CalendarDays, Clock, MapPin } from "lucide-react";
+import { format, addDays, isSameDay } from "date-fns";
+import { CalendarDays, Clock, MapPin, CreditCard } from "lucide-react";
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
 import { formatCurrency, formatTime } from "~/lib/utils";
 import { Skeleton } from "~/components/ui/skeleton";
-import { 
-  Tabs, 
-  TabsContent, 
-  TabsList, 
-  TabsTrigger 
-} from "~/components/ui/tabs";
+import { Badge } from "~/components/ui/badge";
+import { Card, CardContent } from "~/components/ui/card";
+import type { Show } from "~/types";
 
 type ShowTimesProps = {
   movieId: string;
 };
 
+type GroupedShows = Record<string, {
+  theater: {
+    id: string;
+    name: string;
+    location: string;
+  };
+  shows: Show[];
+}>;
+
 export function ShowTimes({ movieId }: ShowTimesProps) {
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  // Generate date options for the next 5 days starting from today
+  const dateOptions = useMemo(() => {
+    const dates: Date[] = [];
+    const today = new Date();
+    
+    for (let i = 0; i < 5; i++) {
+      dates.push(addDays(today, i));
+    }
+    
+    return dates;
+  }, []);
   
-  const { data: shows, isLoading } = api.show.getFiltered.useQuery({
+  const [selectedDate, setSelectedDate] = useState<Date>(dateOptions[0]);
+  
+  const { data: allShows, isLoading } = api.show.getFiltered.useQuery({
     movieId,
     date: selectedDate,
   });
-  
-  // Generate date options for the next 7 days
-  const dateOptions = [];
-  for (let i = 0; i < 7; i++) {
-    const date = new Date();
-    date.setDate(date.getDate() + i);
-    dateOptions.push(date);
-  }
   
   if (isLoading) {
     return <ShowTimesSkeleton />;
   }
   
-  if (!shows || shows.length === 0) {
-    return (
-      <div className="rounded-lg border p-6 text-center">
-        <p className="text-muted-foreground">No shows available for this movie on the selected date.</p>
-        <p className="mt-2 text-sm">Please select a different date or check back later.</p>
-      </div>
-    );
-  }
-  
   // Group shows by theater for better organization
-  const showsByTheater = shows.reduce((acc, show) => {
+  const showsByTheater = allShows?.reduce((acc: GroupedShows, show) => {
     if (!acc[show.theaterId]) {
       acc[show.theaterId] = {
         theater: {
@@ -62,70 +63,115 @@ export function ShowTimes({ movieId }: ShowTimesProps) {
     }
     acc[show.theaterId]!.shows.push(show);
     return acc;
-  }, {} as Record<string, { theater: { id: string; name: string; location: string }; shows: typeof shows }>);
+  }, {} as GroupedShows) ?? {};
+  
+  const hasShows = allShows && allShows.length > 0;
 
   return (
-    <div>
-      <Tabs defaultValue={format(selectedDate, "yyyy-MM-dd")} className="w-full">
-        <TabsList className="mb-6 grid w-full grid-cols-7 bg-muted/50">
-          {dateOptions.map((date) => (
-            <TabsTrigger 
-              key={date.toISOString()} 
-              value={format(date, "yyyy-MM-dd")}
-              onClick={() => setSelectedDate(date)}
-              className="flex flex-col py-2 text-center"
-            >
-              <span className="text-xs font-medium">{format(date, "EEE")}</span>
-              <span className="text-sm">{format(date, "MMM d")}</span>
-            </TabsTrigger>
-          ))}
-        </TabsList>
+    <div className="space-y-6">
+      <div className="sticky top-0 z-10 bg-background pt-2 pb-4">
+        <h3 className="mb-4 flex items-center gap-2 text-xl font-semibold">
+          <CalendarDays className="h-5 w-5 text-primary" />
+          Show Times
+        </h3>
         
-        <TabsContent value={format(selectedDate, "yyyy-MM-dd")}>
+        <div className="flex overflow-x-auto pb-2">
+          {dateOptions.map((date) => {
+            const isSelected = isSameDay(date, selectedDate);
+            const isToday = isSameDay(date, new Date());
+            
+            return (
+              <Button
+                key={date.toISOString()}
+                variant={isSelected ? "default" : "outline"}
+                className={`mr-2 min-w-[100px] flex-col rounded-full border px-4 py-2 ${
+                  isSelected ? "" : "border-muted-foreground/20"
+                }`}
+                onClick={() => setSelectedDate(date)}
+              >
+                <span className="text-xs font-normal">{format(date, "EEE")}</span>
+                <span className="text-base font-medium">{format(date, "d MMM")}</span>
+                {isToday && (
+                  <Badge variant="outline" className="mt-1 px-2 py-0 text-xs font-normal">
+                    Today
+                  </Badge>
+                )}
+              </Button>
+            );
+          })}
+        </div>
+      </div>
+      
+      <div className="pt-2">
+        {hasShows ? (
           <div className="space-y-6">
             {Object.values(showsByTheater).map(({ theater, shows }) => (
-              <div key={theater.id} className="overflow-hidden rounded-lg border">
+              <Card key={theater.id} className="overflow-hidden border-muted-foreground/20">
                 <div className="bg-muted/30 p-4">
-                  <h3 className="text-lg font-medium">{theater.name}</h3>
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <MapPin className="mr-1 h-4 w-4" />
+                  <h3 className="text-lg font-semibold">{theater.name}</h3>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <MapPin className="h-3.5 w-3.5" />
                     <span>{theater.location}</span>
                   </div>
                 </div>
-                <div className="p-4">
+                <CardContent className="p-4 pt-4">
+                  <h4 className="mb-3 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                    <Clock className="h-4 w-4" /> 
+                    Available Shows
+                  </h4>
                   <div className="flex flex-wrap gap-3">
                     {shows.map((show) => (
-                      <Link key={show.id} href={`/booking/${show.id}`}>
+                      <Link key={show.id} href={`/booking/${show.id}`} className="group">
                         <Button 
                           variant="outline" 
-                          className="flex flex-col hover:bg-primary hover:text-primary-foreground transition-colors"
+                          className="flex h-auto flex-col gap-1 border-muted-foreground/30 p-3 transition-all group-hover:border-primary group-hover:text-primary"
                         >
                           <span className="text-base font-medium">{formatTime(show.startTime)}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {show.screen.name} · {formatCurrency(show.price)}
-                          </span>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <span>{show.screen.name}</span>
+                            <span className="h-1 w-1 rounded-full bg-muted-foreground/50"></span>
+                            <span className="flex items-center gap-0.5">
+                              <CreditCard className="h-3 w-3" />
+                              {formatCurrency(show.price)}
+                            </span>
+                          </div>
                         </Button>
                       </Link>
                     ))}
                   </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
-        </TabsContent>
-      </Tabs>
+        ) : (
+          <Card className="border-dashed border-muted-foreground/20 p-8 text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <CalendarDays className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium">No shows available</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              There are no shows scheduled for this movie on {format(selectedDate, "EEEE, MMMM d")}.
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Please select a different date or check back later.
+            </p>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }
 
 function ShowTimesSkeleton() {
   return (
-    <div>
-      <div className="mb-6 flex items-center gap-2">
-        <Skeleton className="h-5 w-5" />
-        {Array.from({ length: 7 }).map((_, i) => (
-          <Skeleton key={i} className="h-10 w-20" />
-        ))}
+    <div className="space-y-6">
+      <div>
+        <Skeleton className="mb-4 h-6 w-32" />
+        <div className="flex gap-2 overflow-x-auto pb-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-[100px]" />
+          ))}
+        </div>
       </div>
       
       <div className="space-y-6">
@@ -133,9 +179,10 @@ function ShowTimesSkeleton() {
           <div key={i} className="overflow-hidden rounded-lg border">
             <Skeleton className="h-16 w-full" />
             <div className="p-4">
+              <Skeleton className="mb-3 h-4 w-32" />
               <div className="flex flex-wrap gap-3">
-                {Array.from({ length: 4 }).map((_, j) => (
-                  <Skeleton key={j} className="h-14 w-24" />
+                {Array.from({ length: 5 }).map((_, j) => (
+                  <Skeleton key={j} className="h-16 w-24" />
                 ))}
               </div>
             </div>

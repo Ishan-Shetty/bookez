@@ -68,15 +68,11 @@ export function ShowsList({ movieId, theaterId }: Props) {
                 : "outline"
             }
             size="sm"
-            className="flex min-w-[100px] flex-col px-3"
+            className="flex min-w-[120px] flex-col px-3 py-3"
             onClick={() => setSelectedDate(date)}
           >
-            <span className="text-xs">
-              {format(date, "EEE")}
-            </span>
-            <span>
-              {format(date, "MMM d")}
-            </span>
+            <span className="text-sm">{format(date, "EEE")}</span>
+            <span className="text-base font-medium">{format(date, "MMM d")}</span>
           </Button>
         ))}
       </div>

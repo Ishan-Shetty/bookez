@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: MoviePageProps): Promise<Meta
       title: movie ? `${movie.title} | BookEZ` : "Movie Details | BookEZ",
       description: movie?.description ?? "View movie details and book tickets",
     };
-  } catch (error) {
+  } catch {
     return {
       title: "Movie Details | BookEZ",
       description: "View movie details and book tickets",
@@ -40,21 +40,23 @@ export default async function MoviePage({ params }: MoviePageProps) {
     
     return (
       <HydrateClient>
-        <div className="container py-8">
-          <div className="mb-6">
-            <Link href="/movies">
-              <Button variant="ghost" size="sm" className="pl-0">
-                <ChevronLeft className="mr-1 h-4 w-4" />
-                Back to Movies
-              </Button>
-            </Link>
+        <div className="min-h-screen bg-background">
+          <div className="container py-4">
+            <div className="mb-4">
+              <Link href="/movies">
+                <Button variant="ghost" size="sm" className="pl-0 text-muted-foreground">
+                  <ChevronLeft className="mr-1 h-4 w-4" />
+                  Back to All Movies
+                </Button>
+              </Link>
+            </div>
+            
+            <MovieDetails movie={movie} />
           </div>
-          
-          <MovieDetails movie={movie} />
         </div>
       </HydrateClient>
     );
-  } catch (error) {
+  } catch {
     notFound();
   }
 }

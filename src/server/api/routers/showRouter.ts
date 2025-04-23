@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure, adminProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
-import { startOfDay, endOfDay } from "date-fns";
+import { startOfDay, endOfDay, addHours } from "date-fns";
 import type { Prisma } from "@prisma/client";
 
 export const showRouter = createTRPCRouter({
@@ -11,18 +11,55 @@ export const showRouter = createTRPCRouter({
         movieId: z.string().nonempty(),
         theaterId: z.string().nonempty(),
         screenId: z.string().nonempty(),
-        startTime: z.date(), // Changed from showTime to startTime
-        endTime: z.date(),
+        startTime: z.date(),
         price: z.number().positive(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        const { movieId, theaterId, screenId, startTime, endTime, price } = input;
+        const { movieId, theaterId, screenId, startTime, price } = input;
+        
+        // Calculate approximate endTime for conflict checking (2 hours after start)
+        const approximateEndTime = addHours(startTime, 2);
+        
+        // Check for time conflicts
+        const conflictingShows = await ctx.db.show.findMany({
+          where: {
+            screenId,
+            OR: [
+              {
+                // Show starts during another show's estimated time
+                startTime: {
+                  gte: startTime,
+                  lt: approximateEndTime,
+                },
+              },
+              {
+                // Another show starts during this show's estimated time
+                startTime: {
+                  gte: startTime,
+                  lt: approximateEndTime,
+                },
+              },
+            ],
+          },
+        });
+
+        if (conflictingShows.length > 0) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "There's already a show scheduled at this time for the selected screen",
+          });
+        }
+        
         return await ctx.db.show.create({
-          data: { movieId, theaterId, screenId, startTime, endTime, price },
+          data: { movieId, theaterId, screenId, startTime, price },
         });
       } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: error instanceof Error ? error.message : "Failed to create show",
@@ -174,11 +211,65 @@ export const showRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       try {
         const { id, ...data } = input;
+        
+        // Check for conflicts if updating times or screen
+        if ((data.startTime || data.screenId)) {
+          const currentShow = await ctx.db.show.findUnique({
+            where: { id },
+            select: { startTime: true, screenId: true },
+          });
+          
+          if (!currentShow) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Show not found",
+            });
+          }
+          
+          const checkStartTime = data.startTime ?? currentShow.startTime;
+          const checkScreenId = data.screenId ?? currentShow.screenId;
+          const approximateEndTime = addHours(checkStartTime, 2);
+          
+          const conflictingShows = await ctx.db.show.findMany({
+            where: {
+              id: { not: id }, // Exclude current show
+              screenId: checkScreenId,
+              OR: [
+                {
+                  // Another show starts during this show's time
+                  startTime: {
+                    gte: checkStartTime,
+                    lt: approximateEndTime,
+                  },
+                },
+                {
+                  // This show starts during another show's time
+                  startTime: {
+                    lt: checkStartTime,
+                    gt: addHours(checkStartTime, -2), // Assuming ~2 hours per show
+                  },
+                },
+              ],
+            },
+          });
+          
+          if (conflictingShows.length > 0) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "There's already a show scheduled at this time for the selected screen",
+            });
+          }
+        }
+        
         return await ctx.db.show.update({
           where: { id },
           data,
         });
       } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: error instanceof Error ? error.message : "Failed to update show",

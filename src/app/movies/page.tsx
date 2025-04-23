@@ -22,12 +22,7 @@ export default function MoviesPage() {
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Movies</h1>
-        <Link
-          href="/movies/new"
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
-        >
-          Add New Movie
-        </Link>
+        {/* Removed the "Add New Movie" button that was here */}
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

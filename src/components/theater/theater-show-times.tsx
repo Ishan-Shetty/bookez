@@ -68,11 +68,11 @@ export function ShowTimes({ theaterId }: ShowTimesProps) {
             key={date.toISOString()}
             variant={selectedDate.toDateString() === date.toDateString() ? "default" : "outline"}
             size="sm"
-            className="flex min-w-[100px] flex-col"
+            className="flex min-w-[120px] flex-col py-3"
             onClick={() => setSelectedDate(date)}
           >
-            <span className="text-xs">{format(date, "EEE")}</span>
-            <span>{format(date, "MMM d")}</span>
+            <span className="text-sm">{format(date, "EEE")}</span>
+            <span className="text-base font-medium">{format(date, "MMM d")}</span>
           </Button>
         ))}
       </div>
