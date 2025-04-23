@@ -36,7 +36,7 @@ export function MoviesGrid() {
     );
   }
 
-  let filteredMovies = movies.filter((movie) =>
+  const filteredMovies = movies.filter((movie) =>
     movie.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (movie.description?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
@@ -89,7 +89,9 @@ export function MoviesGrid() {
 
       {filteredMovies.length === 0 ? (
         <div className="rounded-lg border p-6 text-center">
-          <p className="text-muted-foreground">No movies found matching "{searchQuery}"</p>
+          <p className="text-muted-foreground">
+            No movies found matching &quot;{searchQuery}&quot;
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">

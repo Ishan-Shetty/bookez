@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import { type Metadata } from "next";
 import { HydrateClient, api } from "~/trpc/server";
 import { MovieDetails } from "~/components/movie/movie-details";
-import { ShowTimes } from "~/components/movie/show-times";
+import Link from "next/link";
+import { Button } from "~/components/ui/button";
+import { ChevronLeft } from "lucide-react";
 
 interface MoviePageProps {
   params: {
@@ -39,12 +41,16 @@ export default async function MoviePage({ params }: MoviePageProps) {
     return (
       <HydrateClient>
         <div className="container py-8">
-          <MovieDetails movie={movie} />
-          
-          <div className="mt-12">
-            <h2 className="mb-6 text-2xl font-bold">Show Times</h2>
-            <ShowTimes movieId={id} />
+          <div className="mb-6">
+            <Link href="/movies">
+              <Button variant="ghost" size="sm" className="pl-0">
+                <ChevronLeft className="mr-1 h-4 w-4" />
+                Back to Movies
+              </Button>
+            </Link>
           </div>
+          
+          <MovieDetails movie={movie} />
         </div>
       </HydrateClient>
     );

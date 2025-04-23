@@ -42,7 +42,9 @@ export function MovieGrid() {
       </div>
       
       {filteredMovies.length === 0 ? (
-        <p className="mt-8 text-center text-muted-foreground">No movies found matching "{searchQuery}"</p>
+        <p className="mt-8 text-center text-muted-foreground">
+          No movies found matching &quot;{searchQuery}&quot;
+        </p>
       ) : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {filteredMovies.map((movie) => (

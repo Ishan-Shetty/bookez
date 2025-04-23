@@ -3,11 +3,17 @@
 import { useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, Clock, MapPin } from "lucide-react";
 import { api } from "~/trpc/react";
 import { Button } from "~/components/ui/button";
 import { formatCurrency, formatTime } from "~/lib/utils";
 import { Skeleton } from "~/components/ui/skeleton";
+import { 
+  Tabs, 
+  TabsContent, 
+  TabsList, 
+  TabsTrigger 
+} from "~/components/ui/tabs";
 
 type ShowTimesProps = {
   movieId: string;
@@ -16,7 +22,6 @@ type ShowTimesProps = {
 export function ShowTimes({ movieId }: ShowTimesProps) {
   const [selectedDate, setSelectedDate] = useState(new Date());
   
-  // Explicitly filter by movieId to ensure we only get showtimes for this movie
   const { data: shows, isLoading } = api.show.getFiltered.useQuery({
     movieId,
     date: selectedDate,
@@ -58,52 +63,57 @@ export function ShowTimes({ movieId }: ShowTimesProps) {
     acc[show.theaterId]!.shows.push(show);
     return acc;
   }, {} as Record<string, { theater: { id: string; name: string; location: string }; shows: typeof shows }>);
-  
+
   return (
     <div>
-      <div className="mb-6 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-        <CalendarDays className="text-muted-foreground h-5 w-5 flex-shrink-0" />
-        {dateOptions.map((date) => (
-          <Button
-            key={date.toISOString()}
-            variant={selectedDate.toDateString() === date.toDateString() ? "default" : "outline"}
-            size="sm"
-            className="flex min-w-[80px] flex-col"
-            onClick={() => setSelectedDate(date)}
-          >
-            <span className="text-xs">{format(date, "EEE")}</span>
-            <span>{format(date, "MMM d")}</span>
-          </Button>
-        ))}
-      </div>
-      
-      <div className="space-y-6">
-        {Object.values(showsByTheater).map(({ theater, shows }) => (
-          <div key={theater.id} className="overflow-hidden rounded-lg border">
-            <div className="bg-muted/30 p-4">
-              <h3 className="text-lg font-medium">{theater.name}</h3>
-              <p className="text-sm text-muted-foreground">{theater.location}</p>
-            </div>
-            <div className="p-4">
-              <div className="flex flex-wrap gap-3">
-                {shows.map((show) => (
-                  <Link key={show.id} href={`/booking/${show.id}`}>
-                    <Button 
-                      variant="outline" 
-                      className="flex flex-col hover:bg-primary hover:text-primary-foreground transition-colors"
-                    >
-                      <span className="text-base font-medium">{formatTime(show.startTime)}</span>
-                      <span className="text-xs text-muted-foreground group-hover:text-primary-foreground">
-                        {show.screen.name} · {formatCurrency(show.price)}
-                      </span>
-                    </Button>
-                  </Link>
-                ))}
+      <Tabs defaultValue={format(selectedDate, "yyyy-MM-dd")} className="w-full">
+        <TabsList className="mb-6 grid w-full grid-cols-7 bg-muted/50">
+          {dateOptions.map((date) => (
+            <TabsTrigger 
+              key={date.toISOString()} 
+              value={format(date, "yyyy-MM-dd")}
+              onClick={() => setSelectedDate(date)}
+              className="flex flex-col py-2 text-center"
+            >
+              <span className="text-xs font-medium">{format(date, "EEE")}</span>
+              <span className="text-sm">{format(date, "MMM d")}</span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        
+        <TabsContent value={format(selectedDate, "yyyy-MM-dd")}>
+          <div className="space-y-6">
+            {Object.values(showsByTheater).map(({ theater, shows }) => (
+              <div key={theater.id} className="overflow-hidden rounded-lg border">
+                <div className="bg-muted/30 p-4">
+                  <h3 className="text-lg font-medium">{theater.name}</h3>
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <MapPin className="mr-1 h-4 w-4" />
+                    <span>{theater.location}</span>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <div className="flex flex-wrap gap-3">
+                    {shows.map((show) => (
+                      <Link key={show.id} href={`/booking/${show.id}`}>
+                        <Button 
+                          variant="outline" 
+                          className="flex flex-col hover:bg-primary hover:text-primary-foreground transition-colors"
+                        >
+                          <span className="text-base font-medium">{formatTime(show.startTime)}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {show.screen.name} · {formatCurrency(show.price)}
+                          </span>
+                        </Button>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

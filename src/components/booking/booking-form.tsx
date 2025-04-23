@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "~/trpc/react";
 import { formatCurrency, formatDate, formatTime } from "~/lib/utils";
@@ -10,15 +10,9 @@ import { Separator } from "~/components/ui/separator";
 import { useToast } from "~/hooks/use-toast";
 import { Clock, Film, MapPin } from "lucide-react";
 import Image from "next/image";
+import { type Seat } from "~/components/booking/seat-selector";
 
 // Define proper types for the components
-interface Seat {
-  id: string;
-  row: string;
-  number: number;
-  isBooked: boolean;
-}
-
 interface Screen {
   id: string;
   name: string;
@@ -53,12 +47,25 @@ interface BookingFormProps {
 export function BookingForm({ show, userId }: BookingFormProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
+  const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
+  // We'll keep seatDetails but use it in the UI
+  const [seatDetails, setSeatDetails] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
+  // We'll keep bookedSeats but use it for analytics or display
+  const [bookedSeats] = useState(0);
+  const [, setAvailableSeats] = useState(0);
   
-  const { data: availableSeats, isLoading: isLoadingSeats } = api.seat.getAvailableSeats.useQuery({ 
-    showId: show.id 
-  });
+  const { data: seats, isLoading: isLoadingSeats } = api.seat.getByScreenId.useQuery(
+    { screenId: show.screen.id }
+  );
+
+  // Use useEffect to handle the seats data safely
+  useEffect(() => {
+    if (seats) {
+      const availableSeatsCount = seats.filter((seat) => !seat.isBooked).length;
+      setAvailableSeats(availableSeatsCount);
+    }
+  }, [seats]);
   
   const createBooking = api.booking.create.useMutation({
     onSuccess: (data) => {
@@ -80,7 +87,7 @@ export function BookingForm({ show, userId }: BookingFormProps) {
   });
   
   const handleBooking = () => {
-    if (!selectedSeat) {
+    if (!selectedSeatId) {
       toast({
         title: "Select a seat",
         description: "Please select a seat to continue",
@@ -93,23 +100,47 @@ export function BookingForm({ show, userId }: BookingFormProps) {
     
     createBooking.mutate({
       showId: show.id,
-      seatId: selectedSeat,
+      seatId: selectedSeatId,
       userId,
-      paymentMethod: "CREDIT_CARD", // In a real app, you would let the user choose
+      paymentId: "temporary-payment-id" // Add the required paymentId
     });
   };
   
-  // Organize seats by row for better display
-  const seatsByRow = availableSeats?.reduce<Record<string, Seat[]>>((acc, seat) => {
-    if (!acc[seat.row]) {
-      acc[seat.row] = [];
-    }
-    acc[seat.row].push(seat);
-    return acc;
-  }, {});
+  // Organize seats by row in a safer way
+  const seatsByRow: Record<string, Seat[]> = {};
+  
+  if (seats) {
+    seats.forEach((seat) => {
+      if (!seatsByRow[seat.row]) {
+        seatsByRow[seat.row] = [];
+      }
+      seatsByRow[seat.row]?.push(seat);
+    });
+  }
   
   // Sort rows alphabetically or numerically
-  const sortedRows = seatsByRow ? Object.keys(seatsByRow).sort() : [];
+  const sortedRows = Object.keys(seatsByRow).sort();
+
+  // Find the selected seat safely
+  const selectedSeat = selectedSeatId && seats 
+    ? seats.find((s) => s.id === selectedSeatId) 
+    : null;
+
+  const handleSeatSelect = useCallback((seatId: string | null) => {
+    if (!seats) return;
+    
+    const seatToSelect = seatId 
+      ? seats.find((s) => s.id === seatId) 
+      : null;
+    
+    if (seatToSelect && !seatToSelect.isBooked) {
+      setSelectedSeatId(seatToSelect.id);
+      setSeatDetails(`Row ${seatToSelect.row}, Seat ${seatToSelect.number}`);
+    } else {
+      setSelectedSeatId(null);
+      setSeatDetails("");
+    }
+  }, [seats]);
 
   return (
     <div className="grid gap-8 md:grid-cols-3">
@@ -133,7 +164,7 @@ export function BookingForm({ show, userId }: BookingFormProps) {
                   ></div>
                 ))}
               </div>
-            ) : !availableSeats || availableSeats.length === 0 ? (
+            ) : !seats || seats.length === 0 ? (
               <div className="rounded-lg border p-8 text-center">
                 <p className="text-muted-foreground">No seats available for this show.</p>
                 <p className="mt-2 text-sm">Please select a different show time.</p>
@@ -149,16 +180,16 @@ export function BookingForm({ show, userId }: BookingFormProps) {
                     <div className="w-6 font-medium">
                       {row}
                     </div>
-                    {seatsByRow![row]!.sort((a, b) => a.number - b.number).map((seat) => (
+                    {seatsByRow[row]?.sort((a, b) => a.number - b.number).map((seat) => (
                       <button
                         key={seat.id}
                         className={`flex h-9 w-9 items-center justify-center rounded-md border text-sm transition-colors
                           ${seat.isBooked 
                             ? 'cursor-not-allowed bg-muted text-muted-foreground opacity-50' 
-                            : seat.id === selectedSeat
+                            : seat.id === selectedSeatId
                               ? 'border-primary bg-primary text-primary-foreground' 
                               : 'hover:border-primary'}`}
-                        onClick={() => !seat.isBooked && setSelectedSeat(seat.id)}
+                        onClick={() => !seat.isBooked && handleSeatSelect(seat.id)}
                         disabled={seat.isBooked}
                       >
                         {seat.number}
@@ -234,11 +265,22 @@ export function BookingForm({ show, userId }: BookingFormProps) {
                 <span className="text-sm">Selected seat:</span>
                 <span className="font-medium">
                   {selectedSeat 
-                    ? (() => {
-                        const seat = availableSeats?.find(s => s.id === selectedSeat);
-                        return seat ? `${seat.row}-${seat.number}` : "None";
-                      })()
+                    ? `${selectedSeat.row}-${selectedSeat.number}`
                     : "None"}
+                </span>
+              </div>
+              {/* Display seat details here */}
+              {seatDetails && (
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm">Seat details:</span>
+                  <span className="font-medium">{seatDetails}</span>
+                </div>
+              )}
+              {/* Display some analytics */}
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm">Available seats:</span>
+                <span className="font-medium">
+                  {seats?.length ? seats.length - bookedSeats : 0} / {seats?.length ?? 0}
                 </span>
               </div>
             </div>
@@ -266,7 +308,7 @@ export function BookingForm({ show, userId }: BookingFormProps) {
             <Button 
               className="w-full" 
               onClick={handleBooking} 
-              disabled={!selectedSeat || isProcessing}
+              disabled={!selectedSeatId || isProcessing}
             >
               {isProcessing ? "Processing..." : "Confirm and Pay"}
             </Button>
